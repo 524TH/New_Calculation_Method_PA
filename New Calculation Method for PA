@@ -1,0 +1,407 @@
+function [BuddyRatings] = NewMethod_applyScriptF(RawDataTable)
+
+%When loading data: 
+%Make sure the rater student number column is named "Student"
+%Make sure the Ratee student number column is named "Student1".
+
+%%%%%%%%%%
+%%%%%%%%%% NEW
+%Make sure the Group number column is named "Group"
+%Make sure the Group numbers consists of numbers only and no characters
+%%%%%%%%%%
+%%%%%%%%%%
+
+
+%Make sure the question names in the table are Q1 through Q12. 
+
+% RawDataTable.Properties.VariableNames{2} = 'Student1';
+% RawDataTable.Properties.VariableNames{5} = 'Student2';
+% RawDataTable.Properties.VariableNames{5} = 'Stude';
+% RawDataTable.Properties.VariableNames{2} = 'Student';
+% RawDataTable.Properties.VariableNames{5} = 'Student1';
+% RawDataTable.Properties.VariableNames{9} = 'Q1';
+% RawDataTable.Properties.VariableNames{10} = 'Q2';
+% RawDataTable.Properties.VariableNames{11} = 'Q3';
+% RawDataTable.Properties.VariableNames{12} = 'Q4';
+% RawDataTable.Properties.VariableNames{13} = 'Q5';
+% RawDataTable.Properties.VariableNames{14} = 'Q6';
+% RawDataTable.Properties.VariableNames{15} = 'Q';
+% RawDataTable.Properties.VariableNames{13} = 'Q1a';
+% RawDataTable.Properties.VariableNames{14} = 'Q2a';
+% RawDataTable.Properties.VariableNames{15} = 'Q3a';
+% RawDataTable.Properties.VariableNames{18} = 'Q5';
+% RawDataTable.Properties.VariableNames{19} = 'Q6';
+% RawDataTable.Properties.VariableNames{20} = 'Q7';
+% RawDataTable.Properties.VariableNames{21} = 'Q8';
+% RawDataTable.Properties.VariableNames{27} = 'Q9';
+% RawDataTable.Properties.VariableNames{28} = 'Q10';
+% RawDataTable.Properties.VariableNames{29} = 'Q11';
+% RawDataTable.Properties.VariableNames{30} = 'Q12';
+
+
+%% Input variables
+
+BuddyRatingWeight = 0.5;
+AverageValueOfBuddyRating = 3;
+
+NumDeliverables = 1;
+NumQuestionPerDeliverable = 4; 
+NumQuestions = NumDeliverables*NumQuestionPerDeliverable;
+
+
+%% Structure ratings in matrix
+
+NumberOfEntries = size(RawDataTable,1);
+NumberOfStudents = size(unique(RawDataTable.Student1),1); 
+
+Students = unique(RawDataTable.Student);
+Students1 = unique(RawDataTable.Student1);
+
+
+%RaterPositions
+RaterPosition = zeros(NumberOfEntries,1);
+RateePosition = zeros(NumberOfEntries,1);
+
+for i = 1:NumberOfEntries % Link data to student numbers
+
+    RaterPosition(i) = find(Students==RawDataTable.Student(i)); 
+    RateePosition(i) = find(Students1==RawDataTable.Student1(i));
+    
+end 
+
+Tennis = zeros(NumberOfStudents,NumberOfStudents,NumQuestions);
+
+for i = 1:NumberOfEntries
+    
+    Tennis(RaterPosition(i),RateePosition(i),1) = RawDataTable.Q1(i);
+    Tennis(RaterPosition(i),RateePosition(i),2) = RawDataTable.Q2(i);
+    Tennis(RaterPosition(i),RateePosition(i),3) = RawDataTable.Q3(i);
+    Tennis(RaterPosition(i),RateePosition(i),4) = RawDataTable.Q4(i);
+
+    if NumQuestions > 4
+    
+        Tennis(RaterPosition(i),RateePosition(i),5) = RawDataTable.Q5(i);
+        Tennis(RaterPosition(i),RateePosition(i),6) = RawDataTable.Q6(i);
+        Tennis(RaterPosition(i),RateePosition(i),7) = RawDataTable.Q7(i);
+        Tennis(RaterPosition(i),RateePosition(i),8) = RawDataTable.Q8(i);
+
+    end
+
+    if NumQuestions > 8
+    
+        Tennis(RaterPosition(i),RateePosition(i),9) = RawDataTable.Q9(i);
+        Tennis(RaterPosition(i),RateePosition(i),10) = RawDataTable.Q10(i);
+        Tennis(RaterPosition(i),RateePosition(i),11) = RawDataTable.Q11(i);
+        Tennis(RaterPosition(i),RateePosition(i),12) = RawDataTable.Q12(i);
+        
+    end
+    
+end
+%% 
+
+%Retreive and create table RateePositionAndGroupnum
+RateeAndGroup = zeros(NumberOfEntries,2); %make table of RateePosition and the group number
+
+for i=1:NumberOfEntries
+   RateeAndGroup(i,1) = RateePosition(i);
+   RateeAndGroup(i,2) = RawDataTable.Group(i);
+end
+
+RateeAndGroup = unique(RateeAndGroup, 'rows');  %order to unique ratee positions with correlating group num
+
+%All possible group numbers
+GroupTypes = unique(RateeAndGroup(:,2));
+
+NumberOfGroups = size(GroupTypes(:,1));
+NumberOfGroups = NumberOfGroups(1,1);
+
+
+%% If student does NOT COMPLETE RATINGS => give rating of 3 for his fellow group members
+%%%%%%%%%
+
+for k = 1:NumQuestions
+    for r = 1:NumberOfStudents 
+        groupnumber = RateeAndGroup(r,2);
+          for g = 1:NumberOfStudents
+                if RateeAndGroup(g,2) == groupnumber
+                    if g ~= r
+                        if Tennis(r,g,k)== 0
+                            Tennis(r,g,k) = AverageValueOfBuddyRating;
+                        end
+                    end
+                end
+
+          end
+     end
+end
+
+
+
+%%%%%%%%%
+%%%%%%%%%
+%% 
+
+
+%%%%%%%%%% [new method]
+
+%Get average rating given per rater
+
+SumEntriesPerStudent = zeros(NumberOfStudents,NumQuestions);
+NumberOfEntries = zeros(NumberOfStudents,NumQuestions);
+
+for i = 1:NumQuestions 
+    
+    SumEntriesPerStudent(:,i) = sum(Tennis(:,:,i),2); % Total given by student
+    
+    for j = 1:NumberOfStudents
+    
+        NumberOfEntries(j,i) = nnz(Tennis(j,:,i)); % Number of non-zero entries given by student
+    
+    end
+    
+end
+
+AverageRatingRater = SumEntriesPerStudent./NumberOfEntries;
+
+
+%tot ratings per ratee 
+TotRatingRatee = zeros(NumberOfStudents,NumQuestions);
+
+
+for i = 1:NumQuestions 
+    for j = 1:NumberOfStudents
+            
+        TotRatingRatee(j,i) = sum(Tennis(:,j,i)); % Total given by student     
+
+    end
+end 
+
+MaxNumOfStudentPGroup = round(NumberOfStudents/2 ,0); %rough estimate of absolute max number of students in a group (not less than 2 groups in class)
+
+%rating no space per group
+TotRatingNoSpacePGroup = zeros(NumberOfGroups,MaxNumOfStudentPGroup,NumQuestions );
+
+for k = 1:NumQuestions
+for i = 1:NumberOfGroups
+    a=1;
+    for j = 1:NumberOfStudents
+
+        if RateeAndGroup(j,2) == GroupTypes(i,1)
+         
+            TotRatingNoSpacePGroup(i,a,k) = TotRatingRatee(j,k);
+            a = a+1;
+        end
+    end
+end
+end
+
+
+% Rankings No Space Per Group
+RankNoSpacePGroup = zeros(NumberOfGroups,MaxNumOfStudentPGroup, NumQuestions );
+
+for k = 1:NumQuestions
+for i = 1:NumberOfGroups
+  interimRow = TotRatingNoSpacePGroup(i,:,k);
+  SortedInterim = sort(interimRow, 'descend');
+  [~,index] = ismember(interimRow,SortedInterim);
+
+  indexCols = size(index);
+  indexCols = indexCols(1,2);
+  for j = 1:indexCols
+
+     RankNoSpacePGroup(i,j,k) = index(j);
+
+  end
+
+end
+end
+
+
+%%%Rankings for all students lists the rankings (as per group) for all students
+RankingAllStudentsGroups = zeros(NumberOfStudents,NumQuestions);
+
+for k = 1:NumQuestions
+
+    for j = 1:NumberOfGroups
+          a = 1;
+       for i = 1:NumberOfStudents
+           if RateeAndGroup(i,2) == GroupTypes(j)
+      
+         RankingAllStudentsGroups(i,k) = RankNoSpacePGroup(j,a,k);
+        a = a+1;
+           end
+        end
+    end
+end
+
+
+
+%Ratings NoSpace from Data (merge the ratings data to sit at the very left
+%of each row and having no spaces between the rating entries)
+RatingNoSpaceData = zeros(NumberOfStudents,MaxNumOfStudentPGroup,NumQuestions);
+
+for k = 1:NumQuestions
+    
+    for r = 1:NumberOfStudents
+        p = 1;
+        for c = 1:NumberOfStudents
+            if Tennis(r,c,k) >0
+                RatingNoSpaceData(r,p,k) = Tennis(r,c,k);
+                p = p+1;
+            end
+        end
+    end
+end
+
+
+%Sort to decreasing order ratings from data nospace 
+SortRatingNoSpaceData = zeros(size(RatingNoSpaceData));
+
+for k = 1:NumQuestions
+    
+    for j = 1:NumberOfStudents
+          a = 1;
+          interimRow = RatingNoSpaceData(j,:,k);
+          interimSize = nnz(interimRow);
+
+          NewinterimRow = zeros(1,interimSize);
+            for l = 1:MaxNumOfStudentPGroup
+                if interimRow(1,l) >0
+                    NewinterimRow(1,a) = interimRow(1,l);
+                a = a+1;
+                end
+            end
+
+           
+            SortNewinterimRow = sort(NewinterimRow, 'descend');
+
+            for i = 1:interimSize
+                SortRatingNoSpaceData(j,i,k) = SortNewinterimRow(1,i);
+            end
+         
+    end
+end
+
+
+%swop ratings per rater if needed according to rank - DataNew process
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%Prep matrices for switch operator
+DataNew = zeros(size(Tennis));
+
+for k = 1:NumQuestions
+
+for r = 1:NumberOfStudents
+    interimRow2 = zeros(1,MaxNumOfStudentPGroup); %the rankings of ratings have
+    a = 1;
+   for c = 1:NumberOfStudents
+        if Tennis(r,c,k) > 0
+            interimRow2(1,a) = RankingAllStudentsGroups(c,k);
+           a = a+1;
+        end
+
+   end
+    %change 0 to nan
+    NaNinterimRow2 = interimRow2;
+    NaNinterimRow2(NaNinterimRow2 > 0) = NaN;
+
+    %reduce interimRow2 to size row only values = NewinterimRow2
+    NaNsize = nnz(NaNinterimRow2);
+
+    NewinterimRow2 = zeros(1,NaNsize);
+    a = 1;
+    for i = 1:MaxNumOfStudentPGroup
+        if interimRow2(i) >0
+        NewinterimRow2(i) = interimRow2(i);
+        a = a+1;
+        end
+    end
+
+    %rearrange rankings to what have per row
+    [~,interimSize] = sort(NewinterimRow2,'ascend');
+    interimRow3 = 1:length(NewinterimRow2);
+    interimRow3(interimSize) = interimRow3;
+        
+     %swop values in Data if needed for the row
+     a = 1;
+     for c = 1:NumberOfStudents
+          if Tennis(r,c,k) >0
+              
+              DataNew(r,c,k) = SortRatingNoSpaceData(r,interimRow3(1,a),k);
+              a = a+1;
+          
+          end
+     end
+end
+end
+   
+      
+%normalize ratings
+
+for k = 1:NumQuestions
+    NormDataNew = DataNew./AverageRatingRater(:,k);
+end
+
+%Norm factor (average of Norm Factors will be used as Mark Effect)
+SumNormRatingsRatee = zeros(NumberOfStudents,NumQuestions);
+NumberOfRatingsRatee = zeros(NumberOfStudents,NumQuestions);
+
+for i = 1:NumQuestions 
+    %%%check work column total
+    SumNormRatingsRatee(:,i) = sum(NormDataNew(:,:,i),1); % Total ratings per ratee received
+    
+    for j = 1:NumberOfStudents
+    
+        NumberOfRatingsRatee(j,i) = nnz(NormDataNew(:,j,i)); % Number of non-zero ratings given per ratee
+    
+    end
+    
+end
+
+NormFactorRatee = SumNormRatingsRatee./NumberOfRatingsRatee;
+
+
+
+%% Determine effect of buddy rating after each deliverable
+
+%Average for each question after each deliverable
+
+AverageForDeliverable = zeros(NumberOfStudents,NumDeliverables);
+TotalForDeliverable = zeros(NumberOfStudents,NumDeliverables);
+BuddyRatingScaling = zeros(NumberOfStudents,NumDeliverables);
+NetMarkEffect = zeros(NumberOfStudents,NumDeliverables);
+
+for j = 1:NumberOfStudents
+    
+    for k = 1:NumDeliverables
+        
+        for i = 1:NumQuestionPerDeliverable
+    
+            TotalForDeliverable(j,k) = TotalForDeliverable(j,k) + NormFactorRatee(j,i+NumQuestionPerDeliverable*(k-1));
+            
+        end
+        
+        AverageForDeliverable(j,k) = TotalForDeliverable(j,k)./NumQuestionPerDeliverable;
+        
+    end
+    
+end
+
+DeliverableAverage = zeros(NumberOfStudents,1);
+
+for i = 1:NumDeliverables
+ DeliverableAverage = DeliverableAverage + AverageForDeliverable(:,i);
+end
+
+%Final output 
+
+MarkEffect = AverageForDeliverable-1;
+NetMarkEffect = MarkEffect.*BuddyRatingWeight;
+
+colnames = {'Student Number','Average Norm Rating Per Question', 'Avg Rating effect Per Deliverable', 'Mark Effect Per Deliverable', 'Net Mark Effect Per Deliverable'};
+
+BuddyRatings = table(Students,NormFactorRatee,AverageForDeliverable,MarkEffect,NetMarkEffect, 'VariableNames', colnames);
+BuddyRatings
+
+writetable(BuddyRatings,'BuddyRatingEffects.txt');
+
